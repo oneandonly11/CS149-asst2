@@ -2,6 +2,12 @@
 #define _TASKSYS_H
 
 #include "itasksys.h"
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <unordered_map>
+#include <queue>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -68,6 +74,45 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+
+    private:
+        // thread pool
+       int num_threads;
+        std::vector<std::thread> thread_pool;
+
+        
+        std::atomic<int> num_finished_tasks{0};
+        std::atomic<bool> stop{false};
+
+        
+        std::atomic<int> total_tasks{0};
+
+        std::mutex finish_lock;
+        std::condition_variable finish_cv;
+
+        std::mutex task_lock;
+        std::condition_variable task_cv;
+
+        void runThread();
+
+        std::atomic<TaskID> task_id_counter{0};
+
+        struct TaskInfo {
+            IRunnable* runnable;
+            int total_tasks;
+            std::atomic<int> next_task{0};
+            std::atomic<int> finished_task_count{0};
+        };
+
+
+        std::mutex task_graph_mutex;
+        std::unordered_map<TaskID, std::shared_ptr<TaskInfo>> task_map;
+        std::unordered_map<TaskID, std::vector<TaskID>> reverse_dependencies;
+        std::unordered_map<TaskID, std::vector<TaskID>> forward_dependencies;
+        std::queue<TaskID> ready_queue;
+        
+
+        bool running_task{false};
 };
 
 #endif
